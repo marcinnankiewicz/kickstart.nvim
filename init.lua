@@ -51,7 +51,7 @@ Kickstart Guide:
       - Tutor
       - <enter key>
 
-    (If you already know the Neovim basics, you can skip this step.)
+    (If you already know the Neovim basics, you can skip this stept)
 
   Once you've completed that, you can continue working through **AND READING** the rest
   of the kickstart init.lua.
@@ -204,6 +204,71 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   end,
 })
 
+vim.api.nvim_create_autocmd({ 'BufRead', 'BufNewFile' }, {
+  pattern = {
+    '*/defaults/*.yml',
+    '*/defaults/*.yaml',
+    '*/host_vars/*.yml',
+    '*/host_vars/*.yaml',
+    '*/group_vars/*.yml',
+    '*/group_vars/*.yaml',
+    '*/group_vars/*/*.yml',
+    '*/group_vars/*/*.yaml',
+    '*/playbook*.yml',
+    '*/playbook*.yaml',
+    '*/playbooks/*.yml',
+    '*/playbooks/*.yaml',
+    '*/roles/*/tasks/*.yml',
+    '*/roles/*/tasks/*.yaml',
+    '*/roles/*/handlers/*.yml',
+    '*/roles/*/handlers/*.yaml',
+    '*/tasks/*.yml',
+    '*/tasks/*.yaml',
+    '*/molecule/*.yml',
+    '*/molecule/*.yaml',
+  },
+  callback = function()
+    vim.bo.filetype = 'yaml.ansible'
+  end,
+})
+
+if vim.g.started_by_firenvim == true then
+  vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI' }, {
+    callback = function(e)
+      if vim.g.timer_started == true then
+        return
+      end
+      vim.g.timer_started = true
+      vim.fn.timer_start(2000, function()
+        vim.g.timer_started = false
+        vim.cmd 'silent write'
+      end)
+    end,
+  })
+else
+  -- vim.api.nvim_create_autocmd('VimEnter', {
+  --   desc = 'toogle neotree',
+  --   command = 'set nornu nonu | Neotree toggle',
+  -- })
+  vim.api.nvim_create_autocmd('BufEnter', {
+    command = 'set rnu nu',
+  })
+end
+
+vim.api.nvim_create_autocmd({ 'BufEnter' }, {
+  pattern = 'leetcode.com_*.txt',
+  command = '',
+})
+
+vim.g.firenvim_config = {
+  localSettings = {
+    ['.*'] = {
+      filename = '/tmp/{hostname}_dupa_{pathname%10}.go',
+      cmdline = 'neovim',
+      takeover = 'never',
+    },
+  },
+}
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
 local lazypath = vim.fn.stdpath 'data' .. '/lazy/lazy.nvim'
@@ -243,6 +308,665 @@ require('lazy').setup({
   --    require('gitsigns').setup({ ... })
   --
   -- See `:help gitsigns` to understand what the configuration keys do
+  -- Firenvim
+  { 'glacambre/firenvim', build = ':call firenvim#install(0)' },
+  -- Rust
+  {
+    'rust-lang/rust.vim',
+    ft = 'rust',
+    init = function()
+      vim.g.rustfmt_autosave = 1
+      -- vim.g.rustfmt_fail_silently = 1
+      -- vim.g.rustfmt_config_path = vim.fn.expand('~/.config/rustfmt.toml')
+    end,
+  },
+  {
+    'simrat39/rust-tools.nvim',
+    ft = 'rust',
+    opts = {},
+    dependencies = {
+      'neovim/nvim-lspconfig',
+    },
+  },
+  -- Copilot
+  --
+
+  { 'github/copilot.vim' },
+
+  -- Code companion
+  {
+    'olimorris/codecompanion.nvim',
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+      'nvim-treesitter/nvim-treesitter',
+      'ravitemer/mcphub.nvim',
+    },
+    config = function()
+      require('codecompanion').setup {
+        extensions = {
+          mcphub = {
+            callback = 'mcphub.extensions.codecompanion',
+            opts = {
+              make_vars = true,
+              make_slash_commands = true,
+              show_result_in_chat = true,
+            },
+          },
+        },
+      }
+    end,
+    opts = {
+      -- NOTE: The log_level is in `opts.opts`
+      opts = {
+        log_level = 'DEBUG', -- or "TRACE"
+      },
+    },
+  },
+  -- mpc server
+  {
+    'ravitemer/mcphub.nvim',
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+    },
+    build = 'npm install -g mcp-hub@latest', -- Installs `mcp-hub` node binary globally
+    config = function()
+      require('mcphub').setup()
+    end,
+  },
+  -- Neoorg
+  {
+    'vhyrro/luarocks.nvim',
+    priority = 1000, -- We'd like this plugin to load first out of the rest
+    config = true, -- This automatically runs `require("luarocks-nvim").setup()`
+  },
+  {
+    'nvim-neorg/neorg',
+    dependencies = { 'luarocks.nvim' },
+    lazy = false, -- Disable lazy loading as some `lazy.nvim` distributions set `lazy = true` by default
+    version = '*', -- Pin Neorg to the latest stable release
+    config = true,
+    opts = {
+      load = {
+        ['core.defaults'] = {}, -- Load all the default modules
+        ['core.export'] = {}, -- Load all the default modules
+        ['core.concealer'] = {},
+        ['core.dirman'] = { -- Manage your directories with Neorg
+          config = {
+            workspaces = {
+              work = '~/work-notes/',
+              priv = '~/priv-notes/',
+              crypto = '~/crypto-notes/',
+              cityscope = '/home/nankiewi/cityscope/',
+            },
+          },
+        },
+      },
+    },
+  },
+
+  -- Dap & debug
+  {
+    'rcarriga/nvim-dap-ui',
+    dependencies = { 'mfussenegger/nvim-dap' },
+    config = function()
+      local dap = require 'dap'
+      local dapui = require 'dapui'
+      dapui.setup()
+      dap.listeners.after.event_initialized['dapui_config'] = function()
+        dapui.open()
+      end
+      dap.listeners.after.event_terminated['dapui_config'] = function()
+        dapui.close()
+      end
+      dap.listeners.after.event_exited['dapui_config'] = function()
+        dapui.close()
+      end
+    end,
+    keys = {
+      {
+        '<leader>db',
+        '<cmd> DapToggleBreakpoint <CR>',
+        desc = 'setup break point',
+      },
+      {
+        '<leader>dpr',
+        function()
+          require('dap-python').test_method()
+        end,
+        desc = 'debug python run',
+      },
+    },
+  },
+
+  { 'williamboman/mason.nvim', opts = { ensure_installed = { 'pyright', 'debugpy' } } },
+  { 'mfussenegger/nvim-dap' },
+  {
+    'mfussenegger/nvim-dap-python',
+    ft = 'python',
+    dependencies = { 'mfussenegger/nvim-dap', 'rcarriga/nvim-dap-ui' },
+    config = function()
+      require('dap-python').test_runner = 'pytest'
+      require('dap-python').setup 'python'
+    end,
+  },
+  -- JAVA
+  { 'mfussenegger/nvim-jdtls' },
+
+  -- Golang
+
+  {
+    'ray-x/go.nvim',
+    dependencies = { -- optional packages
+      'ray-x/guihua.lua',
+      'neovim/nvim-lspconfig',
+      'nvim-treesitter/nvim-treesitter',
+    },
+    config = function(lp, opts)
+      require('go').setup(opts)
+      local format_sync_grp = vim.api.nvim_create_augroup('GoFormat', {})
+      -- vim.api.nvim_create_autocmd('BufWritePre', {
+      --   pattern = '*.go',
+      --   callback = function()
+      --     require('go.format').goimports()
+      --   end,
+      --   group = format_sync_grp,
+      -- })
+    end,
+    event = { 'CmdlineEnter' },
+    ft = { 'go', 'gomod' },
+    build = ':lua require("go.install").update_all_sync()', -- if you need to install/update all binaries
+  },
+
+  -- Git
+  { 'tpope/vim-fugitive' },
+  { 'junegunn/gv.vim' },
+
+  -- messages
+  {
+    'folke/noice.nvim',
+    event = 'VeryLazy',
+    opts = {
+      -- add any options here
+    },
+    dependencies = {
+      -- if you lazy-load any plugin below, make sure to add proper `module="..."` entries
+      'MunifTanjim/nui.nvim',
+      -- OPTIONAL:
+      --   `nvim-notify` is only needed, if you want to use the notification view.
+      --   If not available, we use `mini` as the fallback
+      'rcarriga/nvim-notify',
+    },
+  },
+
+  -- neotree
+  {
+    'nvim-neo-tree/neo-tree.nvim',
+    branch = 'v3.x',
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+      'nvim-tree/nvim-web-devicons', -- not strictly required, but recommended
+      'MunifTanjim/nui.nvim',
+      -- "3rd/image.nvim", -- Optional image support in preview window: See `# Preview Mode` for more information
+    },
+    config = function()
+      -- If you want icons for diagnostic errors, you'll need to define them somewhere:
+      vim.fn.sign_define('DiagnosticSignError', { text = ' ', texthl = 'DiagnosticSignError' })
+      vim.fn.sign_define('DiagnosticSignWarn', { text = ' ', texthl = 'DiagnosticSignWarn' })
+      vim.fn.sign_define('DiagnosticSignInfo', { text = ' ', texthl = 'DiagnosticSignInfo' })
+      vim.fn.sign_define('DiagnosticSignHint', { text = '󰌵', texthl = 'DiagnosticSignHint' })
+
+      require('neo-tree').setup {
+        close_if_last_window = false, -- Close Neo-tree if it is the last window left in the tab
+        auto_clean_after_session_restore = true,
+        popup_border_style = 'rounded',
+        enable_git_status = true,
+        enable_diagnostics = true,
+        open_files_do_not_replace_types = { 'terminal', 'trouble', 'qf' }, -- when opening files, do not use windows containing these filetypes or buftypes
+        sort_case_insensitive = false, -- used when sorting files and directories in the tree
+        sort_function = nil, -- use a custom function for sorting files and directories in the tree
+        -- sort_function = function (a,b)
+        --       if a.type == b.type then
+        --           return a.path > b.path
+        --       else
+        --           return a.type > b.type
+        --       end
+        --   end , -- this sorts files and directories descendantly
+        default_component_configs = {
+          container = {
+            enable_character_fade = true,
+          },
+          indent = {
+            indent_size = 2,
+            padding = 1, -- extra padding on left hand side
+            -- indent guides
+            with_markers = true,
+            indent_marker = '│',
+            last_indent_marker = '└',
+            highlight = 'NeoTreeIndentMarker',
+            -- expander config, needed for nesting files
+            with_expanders = nil, -- if nil and file nesting is enabled, will enable expanders
+            expander_collapsed = '',
+            expander_expanded = '',
+            expander_highlight = 'NeoTreeExpander',
+          },
+          icon = {
+            folder_closed = '',
+            folder_open = '',
+            folder_empty = '󰜌',
+            provider = function(icon, node, state) -- default icon provider utilizes nvim-web-devicons if available
+              if node.type == 'file' or node.type == 'terminal' then
+                local success, web_devicons = pcall(require, 'nvim-web-devicons')
+                local name = node.type == 'terminal' and 'terminal' or node.name
+                if success then
+                  local devicon, hl = web_devicons.get_icon(name)
+                  icon.text = devicon or icon.text
+                  icon.highlight = hl or icon.highlight
+                end
+              end
+            end,
+            -- The next two settings are only a fallback, if you use nvim-web-devicons and configure default icons there
+            -- then these will never be used.
+            default = '*',
+            highlight = 'NeoTreeFileIcon',
+          },
+          modified = {
+            symbol = '[+]',
+            highlight = 'NeoTreeModified',
+          },
+          name = {
+            trailing_slash = false,
+            use_git_status_colors = true,
+            highlight = 'NeoTreeFileName',
+          },
+          git_status = {
+            symbols = {
+              -- Change type
+              added = '', -- or "✚", but this is redundant info if you use git_status_colors on the name
+              modified = '', -- or "", but this is redundant info if you use git_status_colors on the name
+              deleted = '✖', -- this can only be used in the git_status source
+              renamed = '󰁕', -- this can only be used in the git_status source
+              -- Status type
+              untracked = '',
+              ignored = '',
+              unstaged = '󰄱',
+              staged = '',
+              conflict = '',
+            },
+          },
+          -- If you don't want to use these columns, you can set `enabled = false` for each of them individually
+          file_size = {
+            enabled = true,
+            width = 12, -- width of the column
+            required_width = 64, -- min width of window required to show this column
+          },
+          type = {
+            enabled = true,
+            width = 10, -- width of the column
+            required_width = 122, -- min width of window required to show this column
+          },
+          last_modified = {
+            enabled = true,
+            width = 20, -- width of the column
+            required_width = 88, -- min width of window required to show this column
+          },
+          created = {
+            enabled = true,
+            width = 20, -- width of the column
+            required_width = 110, -- min width of window required to show this column
+          },
+          symlink_target = {
+            enabled = false,
+          },
+        },
+        -- A list of functions, each representing a global custom command
+        -- that will be available in all sources (if not overridden in `opts[source_name].commands`)
+        -- see `:h neo-tree-custom-commands-global`
+        commands = {},
+        window = {
+          position = 'left',
+          width = 40,
+          mapping_options = {
+            noremap = true,
+            nowait = true,
+          },
+          mappings = {
+            ['<space>'] = {
+              'toggle_node',
+              nowait = false, -- disable `nowait` if you have existing combos starting with this char that you want to use
+            },
+            ['<2-LeftMouse>'] = 'open',
+            ['<cr>'] = 'open',
+            ['<esc>'] = 'cancel', -- close preview or floating neo-tree window
+            ['P'] = { 'toggle_preview', config = { use_float = true, use_image_nvim = true } },
+            -- Read `# Preview Mode` for more information
+            ['l'] = 'focus_preview',
+            ['S'] = 'open_split',
+            ['s'] = 'open_vsplit',
+            -- ["S"] = "split_with_window_picker",
+            -- ["s"] = "vsplit_with_window_picker",
+            ['t'] = 'open_tabnew',
+            -- ["<cr>"] = "open_drop",
+            -- ["t"] = "open_tab_drop",
+            ['w'] = 'open_with_window_picker',
+            --["P"] = "toggle_preview", -- enter preview mode, which shows the current node without focusing
+            ['C'] = 'close_node',
+            -- ['C'] = 'close_all_subnodes',
+            ['z'] = 'close_all_nodes',
+            --["Z"] = "expand_all_nodes",
+            ['a'] = {
+              'add',
+              -- this command supports BASH style brace expansion ("x{a,b,c}" -> xa,xb,xc). see `:h neo-tree-file-actions` for details
+              -- some commands may take optional config options, see `:h neo-tree-mappings` for details
+              config = {
+                show_path = 'none', -- "none", "relative", "absolute"
+              },
+            },
+            ['A'] = 'add_directory', -- also accepts the optional config.show_path option like "add". this also supports BASH style brace expansion.
+            ['d'] = 'delete',
+            ['r'] = 'rename',
+            ['b'] = 'rename_basename',
+            ['y'] = 'copy_to_clipboard',
+            ['x'] = 'cut_to_clipboard',
+            ['p'] = 'paste_from_clipboard',
+            ['c'] = 'copy', -- takes text input for destination, also accepts the optional config.show_path option like "add":
+            -- ["c"] = {
+            --  "copy",
+            --  config = {
+            --    show_path = "none" -- "none", "relative", "absolute"
+            --  }
+            --}
+            ['m'] = 'move', -- takes text input for destination, also accepts the optional config.show_path option like "add".
+            ['q'] = 'close_window',
+            ['R'] = 'refresh',
+            ['?'] = 'show_help',
+            ['<'] = 'prev_source',
+            ['>'] = 'next_source',
+            ['i'] = 'show_file_details',
+            -- ["i"] = {
+            --   "show_file_details",
+            --   -- format strings of the timestamps shown for date created and last modified (see `:h os.date()`)
+            --   -- both options accept a string or a function that takes in the date in seconds and returns a string to display
+            --   -- config = {
+            --   --   created_format = "%Y-%m-%d %I:%M %p",
+            --   --   modified_format = "relative", -- equivalent to the line below
+            --   --   modified_format = function(seconds) return require('neo-tree.utils').relative_date(seconds) end
+            --   -- }
+            -- },
+          },
+        },
+        nesting_rules = {},
+        filesystem = {
+          filtered_items = {
+            visible = false, -- when true, they will just be displayed differently than normal items
+            hide_dotfiles = true,
+            hide_gitignored = true,
+            hide_hidden = true, -- only works on Windows for hidden files/directories
+            hide_by_name = {
+              --"node_modules"
+            },
+            hide_by_pattern = { -- uses glob style patterns
+              --"*.meta",
+              --"*/src/*/tsconfig.json",
+            },
+            always_show = { -- remains visible even if other settings would normally hide it
+              --".gitignored",
+            },
+            always_show_by_pattern = { -- uses glob style patterns
+              --".env*",
+            },
+            never_show = { -- remains hidden even if visible is toggled to true, this overrides always_show
+              --".DS_Store",
+              --"thumbs.db"
+            },
+            never_show_by_pattern = { -- uses glob style patterns
+              --".null-ls_*",
+            },
+          },
+          follow_current_file = {
+            enabled = true, -- This will find and focus the file in the active buffer every time
+            --               -- the current file is changed while the tree is open.
+            leave_dirs_open = false, -- `false` closes auto expanded dirs, such as with `:Neotree reveal`
+          },
+          group_empty_dirs = false, -- when true, empty folders will be grouped together
+          hijack_netrw_behavior = 'open_default', -- netrw disabled, opening a directory opens neo-tree
+          -- in whatever position is specified in window.position
+          -- "open_current",  -- netrw disabled, opening a directory opens within the
+          -- window like netrw would, regardless of window.position
+          -- "disabled",    -- netrw left alone, neo-tree does not handle opening dirs
+          use_libuv_file_watcher = false, -- This will use the OS level file watchers to detect changes
+          -- instead of relying on nvim autocmd events.
+          window = {
+            mappings = {
+              ['<bs>'] = 'navigate_up',
+              ['.'] = 'set_root',
+              ['H'] = 'toggle_hidden',
+              ['/'] = 'fuzzy_finder',
+              ['D'] = 'fuzzy_finder_directory',
+              ['#'] = 'fuzzy_sorter', -- fuzzy sorting using the fzy algorithm
+              -- ["D"] = "fuzzy_sorter_directory",
+              ['f'] = 'filter_on_submit',
+              ['<c-x>'] = 'clear_filter',
+              ['[g'] = 'prev_git_modified',
+              [']g'] = 'next_git_modified',
+              ['o'] = { 'show_help', nowait = false, config = { title = 'Order by', prefix_key = 'o' } },
+              ['oc'] = { 'order_by_created', nowait = false },
+              ['od'] = { 'order_by_diagnostics', nowait = false },
+              ['og'] = { 'order_by_git_status', nowait = false },
+              ['om'] = { 'order_by_modified', nowait = false },
+              ['on'] = { 'order_by_name', nowait = false },
+              ['os'] = { 'order_by_size', nowait = false },
+              ['ot'] = { 'order_by_type', nowait = false },
+              -- ['<key>'] = function(state) ... end,
+            },
+            fuzzy_finder_mappings = { -- define keymaps for filter popup window in fuzzy_finder_mode
+              ['<down>'] = 'move_cursor_down',
+              ['<C-n>'] = 'move_cursor_down',
+              ['<up>'] = 'move_cursor_up',
+              ['<C-p>'] = 'move_cursor_up',
+              -- ['<key>'] = function(state, scroll_padding) ... end,
+            },
+          },
+
+          commands = {}, -- Add a custom command or override a global one using the same function name
+        },
+        buffers = {
+          follow_current_file = {
+            enabled = true, -- This will find and focus the file in the active buffer every time
+            --              -- the current file is changed while the tree is open.
+            leave_dirs_open = false, -- `false` closes auto expanded dirs, such as with `:Neotree reveal`
+          },
+          group_empty_dirs = true, -- when true, empty folders will be grouped together
+          show_unloaded = true,
+          window = {
+            mappings = {
+              ['bd'] = 'buffer_delete',
+              ['<bs>'] = 'navigate_up',
+              ['.'] = 'set_root',
+              ['o'] = { 'show_help', nowait = false, config = { title = 'Order by', prefix_key = 'o' } },
+              ['oc'] = { 'order_by_created', nowait = false },
+              ['od'] = { 'order_by_diagnostics', nowait = false },
+              ['om'] = { 'order_by_modified', nowait = false },
+              ['on'] = { 'order_by_name', nowait = false },
+              ['os'] = { 'order_by_size', nowait = false },
+              ['ot'] = { 'order_by_type', nowait = false },
+            },
+          },
+        },
+        git_status = {
+          window = {
+            position = 'float',
+            mappings = {
+              ['A'] = 'git_add_all',
+              ['gu'] = 'git_unstage_file',
+              ['ga'] = 'git_add_file',
+              ['gr'] = 'git_revert_file',
+              ['gc'] = 'git_commit',
+              ['gp'] = 'git_push',
+              ['gg'] = 'git_commit_and_push',
+              ['o'] = { 'show_help', nowait = false, config = { title = 'Order by', prefix_key = 'o' } },
+              ['oc'] = { 'order_by_created', nowait = false },
+              ['od'] = { 'order_by_diagnostics', nowait = false },
+              ['om'] = { 'order_by_modified', nowait = false },
+              ['on'] = { 'order_by_name', nowait = false },
+              ['os'] = { 'order_by_size', nowait = false },
+              ['ot'] = { 'order_by_type', nowait = false },
+            },
+          },
+        },
+      }
+
+      vim.cmd [[nnoremap \ :Neotree reveal<cr>]]
+    end,
+  },
+  -- brackets
+  {
+    'windwp/nvim-autopairs',
+    event = 'InsertEnter',
+    config = true,
+    -- use opts = {} for passing setup options
+    -- this is equivalent to setup({}) function
+  },
+  -- autosession
+  {
+    'rmagatti/auto-session',
+    lazy = false,
+
+    ---enables autocomplete for opts
+    ---@module "auto-session"
+    ---@type AutoSession.Config
+    opts = {
+      suppressed_dirs = { '~/', '~/Projects', '~/Downloads', '/' },
+      -- log_level = 'debug',
+    },
+    config = function()
+      vim.o.sessionoptions = 'blank,buffers,curdir,folds,help,tabpages,winsize,winpos,terminal,localoptions'
+      require('auto-session').setup {
+        pre_save_cmds = { 'Neotree close' },
+        post_restore_cmds = { 'Neotree filesystem show' },
+      }
+    end,
+  },
+  -- swagger
+  {
+    'vinnymeller/swagger-preview.nvim',
+    cmd = { 'SwaggerPreview', 'SwaggerPreviewStop', 'SwaggerPreviewToggle' },
+    build = 'npm i',
+    config = true,
+  },
+  -- testing
+  {
+    'rcasia/neotest-java',
+    ft = 'java',
+    dependencies = {
+      'mfussenegger/nvim-jdtls',
+      'mfussenegger/nvim-dap', -- for the debugger
+      'rcarriga/nvim-dap-ui', -- recommended
+      'theHamsta/nvim-dap-virtual-text', -- recommended
+    },
+  },
+  {
+    'nvim-neotest/neotest',
+    dependencies = {
+      'nvim-neotest/nvim-nio',
+      'vim-test/vim-test',
+      'nvim-lua/plenary.nvim',
+      'antoinemadec/FixCursorHold.nvim',
+      'nvim-neotest/neotest-python',
+      'nvim-neotest/neotest-plenary',
+      'nvim-neotest/neotest-go',
+      'rcasia/neotest-java',
+      'haydenmeade/neotest-jest',
+      'nvim-neotest/neotest-vim-test',
+      'rouge8/neotest-rust',
+    },
+    config = function()
+      require('neotest').setup {
+        adapters = {
+          require 'neotest-python' {
+            dap = { justMyCode = false },
+            runner = 'pytest',
+            args = { '-vv' },
+          },
+          require 'neotest-java' {
+            junit_jar = nil, -- default: stdpath("data") .. /nvim/neotest-java/junit-platform-console-standalone-[version].jar
+            incremental_build = true,
+          },
+
+          require 'neotest-jest',
+          require 'neotest-go' {
+            experimental = {
+              test_table = true,
+            },
+            args = { '-count=1', '-timeout=60s' },
+          },
+          require 'neotest-plenary',
+          require 'neotest-vim-test' {
+            ignore_file_types = { 'python', 'vim', 'lua' },
+          },
+          require 'neotest-rust',
+        },
+      }
+    end,
+    keys = {
+      {
+        '<leader>tt',
+        function()
+          require('neotest').run.run(vim.fn.expand '%')
+        end,
+        desc = 'Run File',
+      },
+      {
+        '<leader>tT',
+        function()
+          require('neotest').run.run(vim.uv.cwd())
+        end,
+        desc = 'Run All Test Files',
+      },
+      {
+        '<leader>tr',
+        function()
+          require('neotest').run.run()
+        end,
+        desc = 'Run Nearest',
+      },
+      {
+        '<leader>tl',
+        function()
+          require('neotest').run.run_last()
+        end,
+        desc = 'Run Last',
+      },
+      {
+        '<leader>ts',
+        function()
+          require('neotest').summary.toggle()
+        end,
+        desc = 'Toggle Summary',
+      },
+      {
+        '<leader>to',
+        function()
+          require('neotest').output.open { enter = true, auto_close = true }
+        end,
+        desc = 'Show Output',
+      },
+      {
+        '<leader>tO',
+        function()
+          require('neotest').output_panel.toggle()
+        end,
+        desc = 'Toggle Output Panel',
+      },
+      {
+        '<leader>tS',
+        function()
+          require('neotest').run.stop()
+        end,
+        desc = 'Stop',
+      },
+    },
+  },
+
   { -- Adds git related signs to the gutter, as well as utilities for managing changes
     'lewis6991/gitsigns.nvim',
     opts = {
@@ -553,7 +1277,7 @@ require('lazy').setup({
           --
           -- When you move your cursor, the highlights will be cleared (the second autocommand).
           local client = vim.lsp.get_client_by_id(event.data.client_id)
-          if client and client.supports_method(vim.lsp.protocol.Methods.textDocument_documentHighlight) then
+          if client and client.supports_method(client, vim.lsp.protocol.Methods.textDocument_documentHighlight, event.buf) then
             local highlight_augroup = vim.api.nvim_create_augroup('kickstart-lsp-highlight', { clear = false })
             vim.api.nvim_create_autocmd({ 'CursorHold', 'CursorHoldI' }, {
               buffer = event.buf,
@@ -580,7 +1304,7 @@ require('lazy').setup({
           -- code, if the language server you are using supports them
           --
           -- This may be unwanted, since they displace some of your code
-          if client and client.supports_method(vim.lsp.protocol.Methods.textDocument_inlayHint) then
+          if client and client.supports_method(client, vim.lsp.protocol.Methods.textDocument_inlayHint, event.buf) then
             map('<leader>th', function()
               vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled { bufnr = event.buf })
             end, '[T]oggle Inlay [H]ints')
@@ -618,6 +1342,34 @@ require('lazy').setup({
         -- ts_ls = {},
         --
 
+        gopls = {
+          settings = {
+            gopls = {
+              analyses = {
+                nilness = true,
+                unusedparams = true,
+                unusedvariable = true,
+                unusedwrite = true,
+                useany = true,
+              },
+              gofumpt = true,
+              staticcheck = true,
+              usePlaceholders = true,
+            },
+          },
+        },
+        ansiblels = {},
+        pyright = {},
+        rust_analyzer = {},
+        jdtls = {},
+        vtsls = {},
+        -- ts_ls = {},
+        -- vue_ls = {},
+        eslint = {},
+        bashls = {},
+        htmx = { filetypes = { 'html' } },
+        -- html = { filetypes = { 'html' } },
+        templ = { filetypes = { 'templ' } },
         lua_ls = {
           -- cmd = {...},
           -- filetypes = { ...},
@@ -633,7 +1385,78 @@ require('lazy').setup({
           },
         },
       }
+      local vue_language_server_path = vim.fn.stdpath 'data' .. '/mason/packages/vue-language-server/node_modules/@vue/language-server'
+      -- local vue_language_server_path = '/home/nankiewi/.nvm/versions/node/v21.7.1/lib/node_modules/@vue/language-server'
+      local vtsls_config = {
+        init_options = {
+          plugins = {
+            {
+              name = '@vue/typescript-plugin',
+              location = vue_language_server_path,
+              languages = { 'vue' },
+              configNamespace = 'typescript',
+            },
+          },
+        },
 
+        filetypes = { 'typescript', 'javascript', 'javascriptreact', 'typescriptreact', 'vue' },
+      }
+      local vue_language_server = vue_language_server_path
+      vim.lsp.config.vtsls = {
+        cmd = { 'vtsls', '--stdio' },
+        filetypes = { 'vue', 'javascript', 'javascriptreact', 'javascript.jsx', 'typescript', 'typescriptreact', 'typescript.tsx' },
+        root_markers = {
+          'tsconfig.json',
+          'package.json',
+          'jsconfig.json',
+          '.git',
+        },
+        settings = {
+          complete_function_calls = true,
+          vtsls = {
+            enableMoveToFileCodeAction = true,
+            autoUseWorkspaceTsdk = true,
+            experimental = {
+              maxInlayHintLength = 30,
+              completion = {
+                enableServerSideFuzzyMatch = true,
+              },
+            },
+            tsserver = {
+              globalPlugins = {
+                {
+                  name = '@vue/typescript-plugin',
+                  location = vue_language_server,
+                  languages = { 'vue' },
+                  configNamespace = 'typescript',
+                  enableForWorkspaceTypeScriptVersions = true,
+                },
+              },
+            },
+          },
+          typescript = {
+            updateImportsOnFileMove = { enabled = 'always' },
+            suggest = {
+              completeFunctionCalls = true,
+            },
+            inlayHints = {
+              enumMemberValues = { enabled = true },
+              functionLikeReturnTypes = { enabled = true },
+              parameterNames = { enabled = 'literals' },
+              parameterTypes = { enabled = true },
+              propertyDeclarationTypes = { enabled = true },
+              variableTypes = { enabled = false },
+            },
+          },
+          javascript = {
+            updateImportsOnFileMove = { enabled = 'always' },
+          },
+        },
+      }
+      vim.lsp.enable('vtsls', true)
+      -- vim.lsp.config('vtsls', vtsls_config)
+      -- vim.lsp.config('vue_ls', vue_ls_config)
+      -- vim.lsp.enable { 'vtsls', 'vue_ls' }
       -- Ensure the servers and tools above are installed
       --  To check the current status of installed tools and/or manually install
       --  other tools, you can run
@@ -699,15 +1522,59 @@ require('lazy').setup({
       end,
       formatters_by_ft = {
         lua = { 'stylua' },
+        java = { 'google_java_formatter', lsp_format = 'fallback' },
+        javascript = { 'prettierd', 'prettier', stop_after_first = true },
         -- Conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
-        -- javascript = { "prettierd", "prettier", stop_after_first = true },
+      },
+      formatters = {
+        google_java_formatter = {
+          command = 'java -jar /home/nankiewi/Projects/google-java-format-1.25.2-all-deps.jar',
+          args = { '--assume-filename', '$FILENAME' },
+          stdin = true,
+        },
       },
     },
   },
-
+  {
+    'folke/trouble.nvim',
+    opts = {}, -- for default options, refer to the configuration section for custom setup.
+    cmd = 'Trouble',
+    keys = {
+      {
+        '<leader>xx',
+        '<cmd>Trouble diagnostics toggle<cr>',
+        desc = 'Diagnostics (Trouble)',
+      },
+      {
+        '<leader>xX',
+        '<cmd>Trouble diagnostics toggle filter.buf=0<cr>',
+        desc = 'Buffer Diagnostics (Trouble)',
+      },
+      {
+        '<leader>cs',
+        '<cmd>Trouble symbols toggle focus=false<cr>',
+        desc = 'Symbols (Trouble)',
+      },
+      {
+        '<leader>cl',
+        '<cmd>Trouble lsp toggle focus=false win.position=right<cr>',
+        desc = 'LSP Definitions / references / ... (Trouble)',
+      },
+      {
+        '<leader>xL',
+        '<cmd>Trouble loclist toggle<cr>',
+        desc = 'Location List (Trouble)',
+      },
+      {
+        '<leader>xQ',
+        '<cmd>Trouble qflist toggle<cr>',
+        desc = 'Quickfix List (Trouble)',
+      },
+    },
+  },
   { -- Autocompletion
     'hrsh7th/nvim-cmp',
     event = 'InsertEnter',
@@ -728,12 +1595,13 @@ require('lazy').setup({
           -- `friendly-snippets` contains a variety of premade snippets.
           --    See the README about individual language/framework/plugin snippets:
           --    https://github.com/rafamadriz/friendly-snippets
-          -- {
-          --   'rafamadriz/friendly-snippets',
-          --   config = function()
-          --     require('luasnip.loaders.from_vscode').lazy_load()
-          --   end,
-          -- },
+          {
+            'rafamadriz/friendly-snippets',
+            config = function()
+              require('luasnip.loaders.from_vscode').lazy_load()
+              require 'snippets.init'
+            end,
+          },
         },
       },
       'saadparwaiz1/cmp_luasnip',
@@ -747,9 +1615,10 @@ require('lazy').setup({
     config = function()
       -- See `:help cmp`
       local cmp = require 'cmp'
+      -- local cmp_autopairs = require 'nvim-autopairs.completion.cmp'
       local luasnip = require 'luasnip'
       luasnip.config.setup {}
-
+      -- cmp.event:on('confirm_done', cmp_autopairs.on_confirm_done())
       cmp.setup {
         snippet = {
           expand = function(args)
@@ -929,7 +1798,7 @@ require('lazy').setup({
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   --    For additional information, see `:help lazy.nvim-lazy.nvim-structuring-your-plugins`
-  -- { import = 'custom.plugins' },
+  { import = 'custom.plugins' },
 }, {
   ui = {
     -- If you are using a Nerd Font: set icons to an empty table which will use the
